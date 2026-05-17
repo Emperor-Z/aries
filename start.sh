@@ -8,9 +8,10 @@ PYTHON="$CORE_DIR/.venv/bin/python"
 
 export PYTHONPATH="$CORE_DIR/src:$CORE_DIR/.venv/lib/python3.13/site-packages:$ARES_DIR"
 
-# Langfuse API keys (self-hosted, project: ares)
-export LANGFUSE_PUBLIC_KEY="pk-lf-1c029184-7ffd-4064-8dd6-037ce537ac7b"
-export LANGFUSE_SECRET_KEY="sk-lf-ad7b9c17-33de-47f8-a777-4cfecf541162"
+# Langfuse keys should be provided by the local shell/environment.
+# Do not commit real keys to this repository.
+: "${LANGFUSE_PUBLIC_KEY:=}"
+: "${LANGFUSE_SECRET_KEY:=}"
 
 # ── colours ──────────────────────────────────────────────────────────────────
 G='\033[0;32m'; Y='\033[0;33m'; R='\033[0;31m'; N='\033[0m'
@@ -19,6 +20,10 @@ warn() { echo -e "${Y}[warn]${N} $*"; }
 err()  { echo -e "${R}[err]${N} $*"; }
 
 echo -e "\n${G}Ares — starting up${N}\n"
+
+if [ -z "$LANGFUSE_PUBLIC_KEY" ] || [ -z "$LANGFUSE_SECRET_KEY" ]; then
+    warn "Langfuse keys are not set; observability may be disabled or unauthenticated"
+fi
 
 # ── 1. Ollama ─────────────────────────────────────────────────────────────────
 if curl -sf http://localhost:11434/api/tags &>/dev/null; then
