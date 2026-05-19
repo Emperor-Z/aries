@@ -21,9 +21,9 @@ from openjarvis.traces.store import TraceStore
 logger = logging.getLogger(__name__)
 
 LANGFUSE_HOST     = os.environ.get("LANGFUSE_HOST", "http://localhost:3000")
-LANGFUSE_PK       = os.environ.get("LANGFUSE_PUBLIC_KEY", "ares-public")
-LANGFUSE_SK       = os.environ.get("LANGFUSE_SECRET_KEY", "ares-secret")
-TRACE_DB_PATH     = os.path.expanduser("~/.ares/traces.db")
+LANGFUSE_PK       = os.environ.get("LANGFUSE_PUBLIC_KEY", "")
+LANGFUSE_SK       = os.environ.get("LANGFUSE_SECRET_KEY", "")
+TRACE_DB_PATH     = os.environ.get("ARES_TRACE_DB_PATH", os.path.expanduser("~/.ares/traces.db"))
 
 
 # ---------------------------------------------------------------------------

@@ -8,10 +8,15 @@ PYTHON="$CORE_DIR/.venv/bin/python"
 
 export PYTHONPATH="$CORE_DIR/src:$CORE_DIR/.venv/lib/python3.13/site-packages:$ARES_DIR"
 
-# Langfuse keys should be provided by the local shell/environment.
-# Do not commit real keys to this repository.
-: "${LANGFUSE_PUBLIC_KEY:=}"
-: "${LANGFUSE_SECRET_KEY:=}"
+# ── Load secrets from .env (never hardcode keys in this file) ────────────────
+if [ -f "$ARES_DIR/.env" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ARES_DIR/.env"
+    set +a
+else
+    echo "[warn] No .env found — copy .env.example to .env and fill in your keys."
+fi
 
 # ── colours ──────────────────────────────────────────────────────────────────
 G='\033[0;32m'; Y='\033[0;33m'; R='\033[0;31m'; N='\033[0m'
@@ -20,10 +25,6 @@ warn() { echo -e "${Y}[warn]${N} $*"; }
 err()  { echo -e "${R}[err]${N} $*"; }
 
 echo -e "\n${G}Ares — starting up${N}\n"
-
-if [ -z "$LANGFUSE_PUBLIC_KEY" ] || [ -z "$LANGFUSE_SECRET_KEY" ]; then
-    warn "Langfuse keys are not set; observability may be disabled or unauthenticated"
-fi
 
 # ── 1. Ollama ─────────────────────────────────────────────────────────────────
 if curl -sf http://localhost:11434/api/tags &>/dev/null; then
@@ -35,7 +36,23 @@ else
     curl -sf http://localhost:11434/api/tags &>/dev/null && ok "Ollama started" || { err "Ollama failed to start"; exit 1; }
 fi
 
-# ── 2. Langfuse (Docker) ──────────────────────────────────────────────────────
+# ── 2. Required model check ───────────────────────────────────────────────────
+missing_models=$("$PYTHON" -c "
+from ares.engine import check_required_models
+missing = check_required_models()
+print('\n'.join(missing))
+" 2>/dev/null || true)
+
+if [ -n "$missing_models" ]; then
+    warn "Missing Ollama models (pull them before continuing):"
+    while IFS= read -r model; do
+        warn "  ollama pull $model"
+    done <<< "$missing_models"
+    read -rp "  Continue anyway? [y/N] " _yn
+    [[ "$_yn" =~ ^[Yy]$ ]] || { err "Aborted."; exit 1; }
+fi
+
+# ── 3. Langfuse (Docker) ──────────────────────────────────────────────────────
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q ares_langfuse; then
     ok "Langfuse already running (http://localhost:3000)"
 else
@@ -45,7 +62,7 @@ else
     ok "Langfuse started (http://localhost:3000)"
 fi
 
-# ── 3. A2A agent servers ──────────────────────────────────────────────────────
+# ── 4. A2A agent servers ──────────────────────────────────────────────────────
 a2a_up() {
     curl -sf "http://127.0.0.1:$1/health" &>/dev/null
 }
@@ -64,16 +81,11 @@ done
 if [ "$all_up" = false ]; then
     warn "Starting A2A agent servers..."
     "$PYTHON" -c "
-import sys
-sys.path.insert(0, '$CORE_DIR/src')
-sys.path.insert(0, '$CORE_DIR/.venv/lib/python3.13/site-packages')
-sys.path.insert(0, '$ARES_DIR')
 from ares.a2a_server import launch_all
 procs = launch_all(background=True)
-import time; time.sleep(8)   # give servers time to init models
+import time; time.sleep(8)
 " &
 
-    # Wait up to 120s for all A2A servers to come up
     timeout=120
     elapsed=0
     while [ $elapsed -lt $timeout ]; do
@@ -98,7 +110,7 @@ import time; time.sleep(8)   # give servers time to init models
     done
 fi
 
-# ── 4. Drop into REPL ────────────────────────────────────────────────────────
+# ── 5. Drop into REPL ────────────────────────────────────────────────────────
 echo
 echo -e "${G}All services ready.${N}"
 echo -e "  Langfuse UI  : http://localhost:3000"

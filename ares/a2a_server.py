@@ -115,28 +115,19 @@ def make_app(agent_name: str, handler_fn: Any, bus: Any = None) -> FastAPI:
 # ---------------------------------------------------------------------------
 
 def _run_agent_server(agent_name: str, port: int) -> None:
-    """Initialise AresSystem in a subprocess and serve one agent."""
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "ares-core" / "src"))
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent / "ares-core" / ".venv" / "lib" / "python3.13" / "site-packages"))
-    sys.path.insert(0, str(Path(__file__).parent.parent))
+    """Build only the requested agent and serve it via A2A.
 
+    Subprocesses inherit PYTHONPATH from the parent (set by start.sh), so no
+    manual sys.path manipulation is needed here. Each server builds only its
+    own agent — not the full AresSystem — to avoid duplicating model setup.
+    """
     import logging
     logging.basicConfig(level=logging.WARNING)
 
-    from ares.system import AresSystem
-    system = AresSystem()
+    from ares.system import build_single_agent
+    handler_fn, bus = build_single_agent(agent_name)
 
-    agent_map = {
-        "orchestrator": system.run,
-        "coder":        system.coder_run,
-        "thinker":      system.thinker_run,
-        "runner":       system.runner_run,
-        "serena":       system.serena_run,
-    }
-
-    app = make_app(agent_name, agent_map[agent_name], bus=system.bus)
+    app = make_app(agent_name, handler_fn, bus=bus)
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
 

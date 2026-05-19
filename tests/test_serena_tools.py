@@ -1,0 +1,103 @@
+"""Tests for Serena tool wrappers with a fake SerenaClient."""
+
+import sys
+import types
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+def _stub_openjarvis():
+    for mod_name in [
+        "openjarvis", "openjarvis.tools", "openjarvis.tools._stubs",
+        "openjarvis.core", "openjarvis.core.types",
+    ]:
+        sys.modules.setdefault(mod_name, types.ModuleType(mod_name))
+
+    class _BaseTool:
+        pass
+
+    class _ToolSpec:
+        def __init__(self, **kw):
+            self.__dict__.update(kw)
+
+    class _ToolResult:
+        def __init__(self, tool_name, content, success, metadata=None):
+            self.tool_name = tool_name
+            self.content = content
+            self.success = success
+
+    sys.modules["openjarvis.tools._stubs"].BaseTool = _BaseTool
+    sys.modules["openjarvis.tools._stubs"].ToolSpec = _ToolSpec
+    sys.modules["openjarvis.core.types"].ToolResult = _ToolResult
+
+
+@pytest.fixture(autouse=True)
+def _inject():
+    _stub_openjarvis()
+    sys.modules.pop("ares.tools.serena_tools", None)
+    sys.modules.pop("ares.serena_client", None)
+    yield
+    sys.modules.pop("ares.tools.serena_tools", None)
+    sys.modules.pop("ares.serena_client", None)
+
+
+def _make_fake_client(return_value="symbol found at main.py:10"):
+    client = MagicMock()
+    client.call_tool.return_value = return_value
+    return client
+
+
+def test_find_symbol_calls_mcp():
+    with patch("ares.serena_client.get_serena_client", return_value=_make_fake_client("def foo at foo.py:5")):
+        from ares.tools.serena_tools import FindSymbolTool
+        tool = FindSymbolTool()
+        result = tool.execute(name_or_pattern="foo")
+        assert result.success is True
+        assert "foo.py" in result.content
+
+
+def test_find_symbol_mcp_error_returns_failure():
+    client = MagicMock()
+    client.call_tool.side_effect = RuntimeError("MCP process died")
+    with patch("ares.serena_client.get_serena_client", return_value=client):
+        from ares.tools.serena_tools import FindSymbolTool
+        tool = FindSymbolTool()
+        result = tool.execute(name_or_pattern="foo")
+        assert result.success is False
+        assert "MCP process died" in result.content
+
+
+def test_rename_symbol_passes_args():
+    client = _make_fake_client("renamed foo → bar in 3 files")
+    with patch("ares.serena_client.get_serena_client", return_value=client):
+        from ares.tools.serena_tools import RenameSymbolTool
+        tool = RenameSymbolTool()
+        tool.execute(symbol_name="foo", relative_path="main.py", new_name="bar")
+        client.call_tool.assert_called_once_with(
+            "rename_symbol",
+            {"symbol_name": "foo", "relative_path": "main.py", "new_name": "bar"},
+        )
+
+
+def test_all_serena_tools_instantiate():
+    with patch("ares.serena_client.get_serena_client", return_value=_make_fake_client()):
+        from ares.tools.serena_tools import all_serena_tools
+        tools = all_serena_tools()
+        assert len(tools) == 7
+        names = {t.spec.name for t in tools}
+        for expected in ["find_symbol", "rename_symbol", "replace_symbol_body",
+                         "get_symbols_overview", "find_referencing_symbols",
+                         "insert_after_symbol", "search_for_pattern"]:
+            assert expected in names
+
+
+def test_none_args_excluded_from_mcp_call():
+    client = _make_fake_client("ok")
+    with patch("ares.serena_client.get_serena_client", return_value=client):
+        from ares.tools.serena_tools import FindSymbolTool
+        tool = FindSymbolTool()
+        # substring_matching is optional — if not passed, should not appear in MCP call
+        tool.execute(name_or_pattern="bar", substring_matching=None)
+        _, kwargs = client.call_tool.call_args
+        assert "substring_matching" not in client.call_tool.call_args[0][1]

@@ -4,21 +4,34 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 
-# Ensure ares-core is on sys.path
-_core = Path(__file__).parent.parent / "ares-core"
-sys.path.insert(0, str(_core / "src"))
-sys.path.insert(0, str(_core / ".venv" / "lib" / "python3.13" / "site-packages"))
+# Fallback path setup for direct invocation (start.sh sets PYTHONPATH instead).
+_root = Path(__file__).parent
+_core = _root.parent / "ares-core"
+for _p in [
+    str(_core / "src"),
+    str(_core / ".venv" / "lib" / "python3.13" / "site-packages"),
+    str(_root),
+]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+# Load .env before anything else so env vars are available to all modules.
+_env_file = _root / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            os.environ.setdefault(_k.strip(), _v.strip())
 
 logging.basicConfig(
     level=logging.WARNING,
     format="%(levelname)s %(name)s: %(message)s",
 )
-
-# Add ares package itself
-sys.path.insert(0, str(Path(__file__).parent))
 
 from ares.system import AresSystem
 
@@ -45,6 +58,15 @@ def main() -> None:
     system = AresSystem()
     print("Ready.\n")
 
+    history: list[dict] = []
+
+    def _shutdown() -> None:
+        system.shutdown()
+
+    import atexit, signal
+    atexit.register(_shutdown)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+
     while True:
         try:
             raw = input("ares> ").strip()
@@ -64,7 +86,6 @@ def main() -> None:
             print(f"Done: {summary}\n")
             continue
 
-        # Check for direct agent override
         direct_method = None
         prompt = raw
         for cmd, method in COMMANDS.items():
@@ -75,9 +96,13 @@ def main() -> None:
 
         try:
             if direct_method:
-                response = getattr(system, direct_method)(prompt)
+                response = getattr(system, direct_method)(prompt, history=history)
             else:
-                response = system.run(prompt)
+                response = system.run(prompt, history=history)
+
+            history.append({"role": "user", "content": prompt})
+            history.append({"role": "assistant", "content": response})
+
             print(f"\n{response}\n")
         except Exception as exc:
             print(f"\n[error] {exc}\n")
