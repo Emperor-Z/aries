@@ -1,5 +1,34 @@
 # Ares Proprietary Independence Plan
 
+## Status
+
+### Done
+- GitHub repo description updated — no longer mentions OpenJarvis.
+- Hardcoded Langfuse keys removed from `start.sh`; secrets now loaded from
+  `.env` via `source`.
+- `.env.example` added with all configurable env vars documented.
+- Model names and `OLLAMA_HOST` made overridable via environment variables.
+- `check_required_models()` added to `engine.py`; `start.sh` warns on missing
+  pulls at startup.
+- Manual `sys.path` hacks removed from `engine.py`, `a2a_server.py`, `main.py`.
+- `build_single_agent()` added so each A2A subprocess boots only its own agent.
+- Conversation history window added to REPL and wired to all agent calls.
+- `atexit`/`SIGTERM` shutdown handlers added to `main.py`.
+- `tests/` suite added covering history, handoff, Serena tools, A2A endpoints,
+  and config.
+- This plan document added under `docs/`.
+
+### Next
+- Add `ares/runtime/` boundary modules (phase 1 facade).
+- Move all `openjarvis.*` imports behind `ares/runtime/*`.
+- Add static import boundary linter (fails CI if direct openjarvis imports
+  appear outside `ares/runtime`).
+- Add Ares proprietary license file + third-party Apache-2.0 attribution file.
+- Rename any remaining comments/docstrings that describe Ares as an OpenJarvis
+  wrapper.
+
+---
+
 ## Summary
 
 Make Ares a proprietary, Ares-owned system rather than a visible mix of
