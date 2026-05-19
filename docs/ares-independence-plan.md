@@ -29,6 +29,32 @@
 
 ---
 
+## Current State — openjarvis import map
+
+Every direct `openjarvis.*` import as of the initial commit. This is the full
+scope of what phase 1 must hide behind `ares/runtime/*`.
+
+| File | Imports |
+|------|---------|
+| `ares/engine.py` | `OllamaEngine` |
+| `ares/memory.py` | `EventBus`, `EventType` |
+| `ares/observability.py` | `EventBus`, `EventType`, `TraceCollector`, `TraceStore` |
+| `ares/learning.py` | `LearningOrchestrator` |
+| `ares/a2a_server.py` | `AgentCard`, `A2AServer` |
+| `ares/tools/serena_tools.py` | `ToolResult`, `BaseTool`, `ToolSpec` |
+| `ares/system.py` | `EventBus` |
+| `ares/agents/coder.py` | `LoopGuard`, `LoopGuardConfig`, `NativeReActAgent`, `EventBus`, `CalculatorTool`, `FileReadTool`, `FileWriteTool`, `ShellExecTool` |
+| `ares/agents/runner.py` | same as coder.py (near-duplicate — merge before phase 1) |
+| `ares/agents/thinker.py` | `LoopGuard`, `LoopGuardConfig`, `NativeOpenHandsAgent`, `EventBus`, `CalculatorTool`, `FileReadTool`, `FileWriteTool`, `ShellExecTool` |
+| `ares/agents/orchestrator.py` | `LoopGuard`, `LoopGuardConfig`, `OrchestratorAgent`, `AgentResult`, `EventBus`, `BaseTool`, `ToolSpec`, `ToolResult` |
+| `ares/agents/serena_agent.py` | `LoopGuard`, `LoopGuardConfig`, `NativeReActAgent`, `EventBus`, `FileReadTool` |
+
+**Note:** `ares/agents/runner.py` and `ares/agents/coder.py` are nearly
+identical. Merge them into a single parameterised module before wrapping behind
+`ares/runtime/agents.py` to avoid duplicating the abstraction.
+
+---
+
 ## Summary
 
 Make Ares a proprietary, Ares-owned system rather than a visible mix of
@@ -65,6 +91,9 @@ Success criteria:
   - `ares/runtime/a2a.py`: expose `AgentCard` and `A2AServer`.
   - `ares/runtime/agents.py`: expose `NativeReActAgent`, `NativeOpenHandsAgent`,
     `LoopGuard`, `LoopGuardConfig`.
+  - `ares/runtime/tasks.py`: expose `TaskState`, `Task`, `Artifact`,
+    `TaskStatus` and a local task store — keeps A2A protocol types out of
+    `a2a.py` and makes the task lifecycle a first-class Ares concern.
 
 - Move all OpenJarvis imports behind these modules:
   - Agents import Ares runtime types/tools/events instead of OpenJarvis.
@@ -126,9 +155,12 @@ Success criteria:
   boundary refactor.
 - Proprietary Ares licensing will be added separately from third-party
   Apache-2.0 attribution.
-- A later phase will replace each runtime adapter with native Ares
+- A later phase (phase 3) will replace each runtime adapter with native Ares
   implementations, starting with the low-risk pieces: events, types, tools, and
   Ollama engine.
+- A2A streaming (SSE / `tasks/sendSubscribe` WebSocket) is a known gap not
+  addressed in phase 1 or 2. The current A2A server handles only synchronous
+  requests. Streaming is a phase 3 item.
 
 ---
 
@@ -208,3 +240,35 @@ prompt-engineering or storage pattern layered on the existing Ollama engine.
 4. Voyager skill library (after Reflexion, shares mem0 plumbing)
 5. ReWOO planning (after phase 1 runtime boundary)
 6. Self-RAG critique (after ReWOO, lowest priority)
+
+---
+
+## Phase 3: Native Ares implementations (cut OpenJarvis fully)
+
+Replace each `ares/runtime/*` adapter with Ares-owned code. OpenJarvis is no
+longer a runtime dependency after this phase.
+
+- `ares/runtime/events.py` → native `EventBus` (asyncio-based pub/sub, no
+  OpenJarvis `core.events`).
+- `ares/runtime/types.py` + `ares/runtime/tasks.py` → Pydantic models owned by
+  Ares; full A2A protocol type set (TaskState, Artifact, typed Parts,
+  JSON-RPC envelopes).
+- `ares/runtime/tools.py` → Ares `BaseTool` / `ToolSpec` / `ToolExecutor`;
+  built-in tools (`FileReadTool`, `FileWriteTool`, `ShellExecTool`,
+  `CalculatorTool`) re-implemented in `ares/tools/`.
+- `ares/runtime/agents.py` → Ares ReAct loop replacing `NativeReActAgent`;
+  OpenHands-style loop replacing `NativeOpenHandsAgent`; `LoopGuard` owned by
+  Ares.
+- `ares/runtime/engine.py` → Ares Ollama client (direct `httpx` calls to
+  `http://localhost:11434`); no OpenJarvis engine.
+- `ares/runtime/tracing.py` → Ares trace store (SQLite) + Langfuse exporter;
+  no OpenJarvis traces.
+- `ares/runtime/learning.py` → Ares learning orchestrator backed by Voyager
+  skill library (phase 2) + mem0.
+- `ares/runtime/a2a.py` → Ares A2A server with synchronous + SSE streaming
+  support; no OpenJarvis A2A.
+- Remove `ares-core/src` from `PYTHONPATH` in `start.sh` and `pyproject.toml`.
+- Delete or archive the `ares-core` checkout.
+
+**Phase 3 ordering:** engine → events → types/tasks → tools → agents →
+tracing → learning → a2a (streaming last).
