@@ -69,7 +69,25 @@ class AresSystem:
         full_prompt = _format_history(history or [], prompt)
         result = self.orchestrator.run(full_prompt)
         self._maybe_learn()
-        return result.content or "(no output)"
+        content = result.content or "(no output)"
+        if self._should_ascend(content):
+            logger.info("Low-confidence orchestrator response — suggesting ascend")
+            content = f"[ASCEND SUGGESTED]\n{content}"
+        return content
+
+    def _should_ascend(self, response: str) -> bool:
+        """Return True if the orchestrator response signals Aries God Mode is needed."""
+        signals = (
+            "i don't know",
+            "i cannot",
+            "i'm not able",
+            "beyond my capability",
+            "cannot complete",
+            "insufficient context",
+            "requires cloud",
+        )
+        lower = response.lower()
+        return any(s in lower for s in signals)
 
     def coder_run(self, prompt: str, history: list[dict] | None = None) -> str:
         result = self.coder.run(_format_history(history or [], prompt))

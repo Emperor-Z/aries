@@ -33,7 +33,7 @@ def _on_memory_store(payload: dict[str, Any]) -> None:
     if mem is None:
         return
     content = payload.get("content") or payload.get("data")
-    user_id = payload.get("user_id", "ares")
+    user_id = payload.get("user_id", "arjun")
     agent_id = payload.get("agent_id")
     if content:
         try:
@@ -47,7 +47,7 @@ def _on_memory_retrieve(payload: dict[str, Any]) -> None:
     if mem is None:
         return
     query = payload.get("query", "")
-    user_id = payload.get("user_id", "ares")
+    user_id = payload.get("user_id", "arjun")
     if query:
         try:
             results = mem.search(query, user_id=user_id)
@@ -63,7 +63,7 @@ def wire_memory_to_bus(bus: EventBus) -> None:
     logger.info("mem0 wired to EventBus")
 
 
-def search(query: str, user_id: str = "ares", limit: int = 5) -> list[dict]:
+def search(query: str, user_id: str = "arjun", limit: int = 5) -> list[dict]:
     """Direct memory search — usable from orchestrator routing logic."""
     mem = _get_mem0()
     if mem is None:

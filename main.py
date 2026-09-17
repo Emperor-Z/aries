@@ -37,9 +37,9 @@ from ares.system import AresSystem
 
 BANNER = """
 ╔══════════════════════════════════════╗
-║  Ares  —  local AI  —  terminal     ║
+║  Ares  —  war god  —  local stack   ║
 ║  /coder  /thinker  /runner          ║
-║  /serena /learn    /quit            ║
+║  /serena /learn    /ascend  /quit   ║
 ╚══════════════════════════════════════╝
 """
 
@@ -53,10 +53,10 @@ COMMANDS = {
 
 def main() -> None:
     print(BANNER)
-    print("Initialising...", flush=True)
+    print("Mustering the war god...", flush=True)
 
     system = AresSystem()
-    print("Ready.\n")
+    print("War god ready.\n")
 
     history: list[dict] = []
 
@@ -71,20 +71,26 @@ def main() -> None:
         try:
             raw = input("ares> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nBye.")
+            print("\nAres standing down.")
             break
 
         if not raw:
             continue
         if raw in ("/quit", "/exit", "exit", "quit"):
-            print("Bye.")
+            print("Ares standing down.")
             break
 
         if raw == "/learn":
-            print("Running rlm learning cycle...")
+            print("Running battle learning cycle...")
             summary = system.learn_now()
             print(f"Done: {summary}\n")
             continue
+
+        if raw == "/ascend":
+            from ares.god_mode import ascend
+            ascend(history=history)
+            print("Ares standing down. The war god has ascended.")
+            break
 
         direct_method = None
         prompt = raw
@@ -103,9 +109,13 @@ def main() -> None:
             history.append({"role": "user", "content": prompt})
             history.append({"role": "assistant", "content": response})
 
-            print(f"\n{response}\n")
+            if response.startswith("[ASCEND SUGGESTED]"):
+                print(f"\n{response}\n")
+                print("[War god] Aries God Mode is recommended. Type /ascend to ascend.\n")
+            else:
+                print(f"\n{response}\n")
         except Exception as exc:
-            print(f"\n[error] {exc}\n")
+            print(f"\n[war god] {exc}\n")
 
 
 if __name__ == "__main__":
