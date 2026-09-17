@@ -4,6 +4,12 @@ Local multi-agent AI system for running specialised assistants on a personal mac
 
 Ares is also the orchestration backbone underneath the [VeriSim](https://github.com/Emperor-Z/verisim) dissertation system, handling local agent routing and memory for that project.
 
+## Demo
+
+![Ares REPL demo](demo/ares-demo.gif)
+
+A real local session: `./start.sh` boots Ollama, Langfuse, and all five A2A agent servers, then `/coder` and `/thinker` run against local models (qwen2.5-coder and deepseek-r1) with real responses. The `/serena` command currently has an open bug where the Serena MCP client isn't receiving the project path correctly - not shown here rather than faked.
+
 ## What It Does
 
 - Routes prompts through an orchestrator agent
