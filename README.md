@@ -1,6 +1,8 @@
-# Ares / Aries
+# Ares
 
 Local multi-agent AI system for running specialised assistants on a personal machine. Ares combines local Ollama models, role-specific agents, A2A HTTP services, memory, Serena code-navigation integration, and Langfuse observability behind a terminal REPL.
+
+Ares is also the orchestration backbone underneath the [VeriSim](https://github.com/Emperor-Z/verisim) dissertation system, handling local agent routing and memory for that project.
 
 ## What It Does
 
@@ -83,4 +85,6 @@ The script checks or starts:
 
 ## Status
 
-This is an experimental personal AI system. It is useful as a portfolio project for local AI orchestration, but it still assumes a local machine layout and model setup. Next improvements should include a one-command installer, sample config, automated tests, and Dockerised agent services.
+This is an experimental personal AI system. It is useful as a portfolio project for local AI orchestration, but it still assumes a local machine layout and model setup. Next improvements should include a one-command installer, sample config, and Dockerised agent services.
+
+Automated tests live in `tests/` (`pytest`), covering A2A endpoints, config loading, agent handoff, conversation history, and the Serena tool wrappers.
