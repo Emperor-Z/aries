@@ -8,11 +8,16 @@ import pytest
 
 
 def _stub_openjarvis():
+    """Install fake openjarvis modules, returning the names that were newly added
+    (as opposed to already present) so the caller can remove only those."""
+    added = []
     for mod_name in [
         "openjarvis", "openjarvis.tools", "openjarvis.tools._stubs",
         "openjarvis.core", "openjarvis.core.types",
     ]:
-        sys.modules.setdefault(mod_name, types.ModuleType(mod_name))
+        if mod_name not in sys.modules:
+            sys.modules[mod_name] = types.ModuleType(mod_name)
+            added.append(mod_name)
 
     class _BaseTool:
         pass
@@ -30,16 +35,19 @@ def _stub_openjarvis():
     sys.modules["openjarvis.tools._stubs"].BaseTool = _BaseTool
     sys.modules["openjarvis.tools._stubs"].ToolSpec = _ToolSpec
     sys.modules["openjarvis.core.types"].ToolResult = _ToolResult
+    return added
 
 
 @pytest.fixture(autouse=True)
 def _inject():
-    _stub_openjarvis()
+    added = _stub_openjarvis()
     sys.modules.pop("ares.tools.serena_tools", None)
     sys.modules.pop("ares.serena_client", None)
     yield
     sys.modules.pop("ares.tools.serena_tools", None)
     sys.modules.pop("ares.serena_client", None)
+    for mod_name in added:
+        sys.modules.pop(mod_name, None)
 
 
 def _make_fake_client(return_value="symbol found at main.py:10"):

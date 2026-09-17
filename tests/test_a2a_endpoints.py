@@ -9,11 +9,16 @@ import pytest
 # ── stubs ─────────────────────────────────────────────────────────────────────
 
 def _stub_openjarvis():
+    """Install fake openjarvis modules, returning the names that were newly added
+    (as opposed to already present) so the caller can remove only those."""
+    added = []
     for mod_name in [
         "openjarvis", "openjarvis.a2a", "openjarvis.a2a.protocol",
         "openjarvis.a2a.server",
     ]:
-        sys.modules.setdefault(mod_name, types.ModuleType(mod_name))
+        if mod_name not in sys.modules:
+            sys.modules[mod_name] = types.ModuleType(mod_name)
+            added.append(mod_name)
 
     class _AgentCard:
         def __init__(self, **kw):
@@ -31,15 +36,17 @@ def _stub_openjarvis():
 
     sys.modules["openjarvis.a2a.protocol"].AgentCard = _AgentCard
     sys.modules["openjarvis.a2a.server"].A2AServer = _A2AServer
-    return _AgentCard
+    return added
 
 
 @pytest.fixture(autouse=True)
 def _inject():
-    _stub_openjarvis()
+    added = _stub_openjarvis()
     sys.modules.pop("ares.a2a_server", None)
     yield
     sys.modules.pop("ares.a2a_server", None)
+    for mod_name in added:
+        sys.modules.pop(mod_name, None)
 
 
 def _make_app(agent_name: str, handler=None):

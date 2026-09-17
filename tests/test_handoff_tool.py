@@ -8,7 +8,11 @@ import pytest
 
 
 def _make_stubs():
-    """Inject minimal openjarvis stubs so we can import orchestrator without OJ installed."""
+    """Inject minimal openjarvis stubs so we can import orchestrator without OJ installed.
+
+    Returns the names of modules that were newly added (as opposed to already
+    present), so the caller can remove only those during teardown.
+    """
     stubs = {
         "openjarvis": types.ModuleType("openjarvis"),
         "openjarvis.agents": types.ModuleType("openjarvis.agents"),
@@ -54,19 +58,26 @@ def _make_stubs():
     stubs["openjarvis.agents.loop_guard"].LoopGuardConfig = _LoopGuardConfig
     stubs["openjarvis.core.events"].EventBus = MagicMock
 
+    added = []
     for name, mod in stubs.items():
-        sys.modules.setdefault(name, mod)
+        if name not in sys.modules:
+            sys.modules[name] = mod
+            added.append(name)
 
-    return _AgentResult, _ToolResult
+    return _AgentResult, _ToolResult, added
 
 
 @pytest.fixture(autouse=True)
 def _inject_stubs():
-    _make_stubs()
+    _, _, added = _make_stubs()
     # Clean up ares.agents.orchestrator so it reimports with stubs
     sys.modules.pop("ares.agents.orchestrator", None)
     yield
     sys.modules.pop("ares.agents.orchestrator", None)
+    sys.modules.pop("ares.config", None)
+    sys.modules.pop("ares.engine", None)
+    for mod_name in added:
+        sys.modules.pop(mod_name, None)
 
 
 def _import_handoff_tool():
@@ -89,7 +100,7 @@ def _import_handoff_tool():
 
 def test_handoff_success():
     _AgentHandoffTool = _import_handoff_tool()
-    AgentResult, ToolResult = _make_stubs()
+    AgentResult, ToolResult, _ = _make_stubs()
 
     mock_agent = MagicMock()
     mock_agent.run.return_value = AgentResult(content="result text", turns=2)
